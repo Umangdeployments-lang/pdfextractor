@@ -21,9 +21,16 @@ def crawl_for_pdfs(start_url, max_pages=15):
             continue
         visited.add(current_url)
 
-        try:
-            # Set a timeout so we don't hang forever
-            response = requests.get(current_url, timeout=5)
+       try:
+            # Disguise the scraper as a real Google Chrome browser
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Referer': 'https://www.google.com/'
+            }
+            # Send the request with the disguise and a slightly longer timeout
+            response = requests.get(current_url, headers=headers, timeout=10)
             
             # Only parse HTML pages
             if 'text/html' not in response.headers.get('Content-Type', ''):
