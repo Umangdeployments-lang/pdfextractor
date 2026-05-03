@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Extractor</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; background: #f9f9f9; }
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        input[type="url"] { width: 70%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        button { padding: 10px 20px; border: none; background: #0066cc; color: white; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0052a3; }
+        .pdf-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+        .pdf-info { display: flex; flex-direction: column; }
+        .pdf-name { font-weight: bold; }
+        .pdf-source { font-size: 12px; color: #666; }
+        #loading { display: none; margin-top: 20px; color: #666; font-style: italic; }
+        #results-header { display: none; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>PDF Extractor</h1>
+        <p>Paste a website link to scan for PDFs.</p>
+        
+        <div style="display: flex; gap: 10px;">
+            <input type="url" id="urlInput" placeholder="https://example.com" required>
+            <button onclick="extractPDFs()">Scan Website</button>
+        </div>
+
+        <div id="loading">Crawling website... This may take a minute depending on the site size.</div>
+
+        <div id="results-header">
+            <h2>Found PDFs</h2>
+            <button onclick="downloadAll()" style="background: #28a745;">Download All</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let globalPdfs = [];
+
+        async function extractPDFs() {
+            const url = document.getElementById('urlInput').value;
+            if (!url) return alert('Please enter a URL');
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('results-header').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                const data = await response.json();
+                document.getElementById('loading').style.display = 'none';
+
+                if (data.pdfs && data.pdfs.length > 0) {
+                    globalPdfs = data.pdfs;
+                    document.getElementById('results-header').style.display = 'flex';
+                    
+                    data.pdfs.forEach(pdf => {
+                        const div = document.createElement('div');
+                        div.className = 'pdf-item';
+                        div.innerHTML = `
+                            <div class="pdf-info">
+                                <span class="pdf-name">${pdf.name}</span>
+                                <a href="${pdf.found_on}" target="_blank" class="pdf-source">Found on: ${pdf.found_on.substring(0, 50)}...</a>
+                            </div>
+                            <button onclick="downloadFile('${pdf.url}', '${pdf.name}')">Download</button>
+                        `;
+                        document.getElementById('results').appendChild(div);
+                    });
+                } else {
+                    document.getElementById('results').innerHTML = '<p>No PDFs found on this site.</p>';
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                alert('Error extracting PDFs. The site might be blocking our scraper.');
+            }
+        }
+
+        // Function to download a single file
+        function downloadFile(url, fileName) {
+            // Ensure the filename ends with .pdf
+            if (!fileName.toLowerCase().endsWith('.pdf')) {
+                fileName += '.pdf';
+            }
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName; // Suggests the file name
+            a.target = '_blank';   // Fallback in case 'download' attribute is ignored by browser CORS
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Function to download all files sequentially
+        function downloadAll() {
+            if (globalPdfs.length === 0) return;
+            
+            alert('Downloading ' + globalPdfs.length + ' files. Your browser may ask for permission to download multiple files.');
+            
+            globalPdfs.forEach((pdf, index) => {
+                // Add a slight delay to prevent the browser from crashing or blocking all popups
+                setTimeout(() => {
+                    downloadFile(pdf.url, pdf.name);
+                }, index * 500); 
+            });
+        }
+    </script>
+</body>
+</html>
